@@ -1,44 +1,35 @@
-import tkinter as tk
-from tkinter import messagebox
-import random
-import string
+from flask import Flask, request, jsonify
+import mysql.connector
+from flask_cors import CORS
 
-def generate_password():
-    try:
-        length = int(length_entry.get())
-        if length <= 0:
-            raise ValueError
-        characters = string.ascii_letters + string.digits + string.punctuation
-        password = ''.join(random.choice(characters) for _ in range(length))
-        password_entry.delete(0, tk.END)
-        password_entry.insert(0, password)
-    except ValueError:
-        messagebox.showerror("Error", "Please enter a valid positive integer for length")
+app = Flask(__name__)
+CORS(app)
 
-def copy_to_clipboard():
-    root.clipboard_clear()
-    root.clipboard_append(password_entry.get())
-    root.update()
-    messagebox.showinfo("Copied", "Password copied to clipboard!")
+db = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="qwerty",
+    database="password_manager"
+)
 
-root = tk.Tk()
-root.title("Password Generator")
-root.geometry("400x200")
 
-frame = tk.Frame(root)
-frame.pack(pady=20)
+@app.route('/store', methods=['POST'])
+def store_password():
+    data = request.json
+    username = data.get('username')
+    website = data.get('website')
+    password = data.get('password')
 
-tk.Label(frame, text="Enter password length:").grid(row=0, column=0)
-length_entry = tk.Entry(frame)
-length_entry.grid(row=0, column=1)
+    if not (username and website and password):
+        return jsonify({"error": "Missing fields"}), 400
 
-generate_btn = tk.Button(frame, text="Generate", command=generate_password)
-generate_btn.grid(row=1, column=0, columnspan=2, pady=5)
+    cursor = db.cursor()
+    cursor.execute("INSERT INTO credentials (username, website, password) VALUES (%s, %s, %s)",
+                   (username, website, password))
+    db.commit()
+    cursor.close()
+    return jsonify({"message": "Password stored successfully"})
 
-password_entry = tk.Entry(frame, width=30)
-password_entry.grid(row=2, column=0, columnspan=2)
 
-copy_btn = tk.Button(frame, text="Copy", command=copy_to_clipboard)
-copy_btn.grid(row=3, column=0, columnspan=2, pady=5)
-
-root.mainloop()
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
